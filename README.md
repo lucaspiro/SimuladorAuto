@@ -1,5 +1,7 @@
 # Simulador — Robot Esquiva Obstáculos
 
+🚀 **Probalo en vivo acá:** [https://lucaspiro.github.io/SimuladorAuto/](https://lucaspiro.github.io/SimuladorAuto/)
+
 Simulador web interactivo para programar y probar la lógica de un robot autónomo sin necesidad del hardware físico. El código que el alumno escribe en el simulador es **el mismo switch/case** que se carga en el Arduino real, sin cambios.
 
 ---
