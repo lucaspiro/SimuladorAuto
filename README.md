@@ -1,4 +1,4 @@
-# 🤖 Simulador — Robot Esquiva Obstáculos
+# Simulador — Robot Esquiva Obstáculos
 
 Simulador web interactivo para programar y probar la lógica de un robot autónomo sin necesidad del hardware físico. El código que el alumno escribe en el simulador es **el mismo switch/case** que se carga en el Arduino real, sin cambios.
 
@@ -21,7 +21,7 @@ auto/
 2. En el editor del panel derecho, pegá tu lógica de control usando el patrón `switch (estado)`.
 3. Presioná **▶ Ejecutar** para correr la simulación.
 4. Si el robot choca, aparece el tiempo que sobrevivió y se reinicia automáticamente.
-5. Para referencia de API, hacé clic en *"Ver ejemplo de uso →"* dentro del simulador.
+5. Para referencia de API, hacé clic en _"Ver ejemplo de uso →"_ dentro del simulador.
 
 ---
 
@@ -33,32 +33,32 @@ El alumno escribe un `switch (estado)` que controla el robot a través de:
 
 ### 🚗 Funciones de movimiento
 
-| Función | Descripción |
-|---|---|
-| `avanzar()` | Ambas ruedas hacia adelante |
-| `retroceder()` | Ambas ruedas hacia atrás |
-| `girarDer()` | Giro en el lugar a la derecha |
-| `girarIzq()` | Giro en el lugar a la izquierda |
-| `parar()` | Detiene los motores |
+| Función        | Descripción                     |
+| -------------- | ------------------------------- |
+| `avanzar()`    | Ambas ruedas hacia adelante     |
+| `retroceder()` | Ambas ruedas hacia atrás        |
+| `girarDer()`   | Giro en el lugar a la derecha   |
+| `girarIzq()`   | Giro en el lugar a la izquierda |
+| `parar()`      | Detiene los motores             |
 
 ### 📡 Sensores (variables globales)
 
-| Variable | Descripción |
-|---|---|
-| `sensor_frontal` | Distancia al obstáculo más cercano adelante (0–250) |
-| `sensor_izquierdo` | Distancia al obstáculo a la izquierda (0–250) |
-| `sensor_derecho` | Distancia al obstáculo a la derecha (0–250) |
+| Variable           | Descripción                                         |
+| ------------------ | --------------------------------------------------- |
+| `sensor_frontal`   | Distancia al obstáculo más cercano adelante (0–250) |
+| `sensor_izquierdo` | Distancia al obstáculo a la izquierda (0–250)       |
+| `sensor_derecho`   | Distancia al obstáculo a la derecha (0–250)         |
 
 Los sensores usan un cono de 15° con 7 rayos — se devuelve la mínima distancia del cono.
 
 ### 🏷️ Estados disponibles
 
-| Constante | Tipo | Cuándo sale |
-|---|---|---|
-| `AVANZAR` | Normal | Al detectar obstáculo |
-| `GIRAR_D` | Corrección suave | Cuando el **sensor** confirma espacio libre |
-| `GIRAR_I` | Corrección suave | Cuando el **sensor** confirma espacio libre |
-| `RETROCEDER` | Escape | Al cumplirse el timer |
+| Constante        | Tipo               | Cuándo sale                                                      |
+| ---------------- | ------------------ | ---------------------------------------------------------------- |
+| `AVANZAR`        | Normal             | Al detectar obstáculo                                            |
+| `GIRAR_D`        | Corrección suave   | Cuando el **sensor** confirma espacio libre                      |
+| `GIRAR_I`        | Corrección suave   | Cuando el **sensor** confirma espacio libre                      |
+| `RETROCEDER`     | Escape             | Al cumplirse el timer                                            |
 | `GIRAR_ESTRAT_D` | Escape estratégico | Al cumplirse el **timer** (sale siempre, aunque no haya espacio) |
 | `GIRAR_ESTRAT_I` | Escape estratégico | Al cumplirse el **timer** (sale siempre, aunque no haya espacio) |
 
@@ -66,18 +66,18 @@ Los sensores usan un cono de 15° con 7 rayos — se devuelve la mínima distanc
 
 ### 🔧 Variables de control de tiempo
 
-| Variable | Descripción |
-|---|---|
-| `estado` | Estado actual de la FSM |
-| `tControl` | `millis()` del momento en que se entró al estado |
-| `tDuracion` | Tiempo en ms que debe durar el estado actual |
+| Variable    | Descripción                                      |
+| ----------- | ------------------------------------------------ |
+| `estado`    | Estado actual de la FSM                          |
+| `tControl`  | `millis()` del momento en que se entró al estado |
+| `tDuracion` | Tiempo en ms que debe durar el estado actual     |
 
 ### ⏱️ Utilidades
 
-| Función | Descripción |
-|---|---|
-| `millis()` | Milisegundos transcurridos desde el inicio (igual que Arduino) |
-| `random(min, max)` | Número entero aleatorio entre `min` y `max-1` |
+| Función            | Descripción                                                    |
+| ------------------ | -------------------------------------------------------------- |
+| `millis()`         | Milisegundos transcurridos desde el inicio (igual que Arduino) |
+| `random(min, max)` | Número entero aleatorio entre `min` y `max-1`                  |
 
 ---
 
@@ -140,12 +140,12 @@ case GIRAR_ESTRAT_D:
 
 El código del simulador y el del Arduino son **idénticos**. La única diferencia está en el entorno:
 
-| | Simulador | Arduino real |
-|---|---|---|
+|                  | Simulador                            | Arduino real                                    |
+| ---------------- | ------------------------------------ | ----------------------------------------------- |
 | `avanzar()` etc. | Modifica `vL`/`vR` del robot virtual | Llama a `aplicar_PWM()` con los motores físicos |
-| `millis()` | `Date.now()` del navegador | Registro interno del microcontrolador |
-| `random()` | `Math.floor(Math.random() * ...)` | `random()` de Arduino |
-| Sensores | Raycast geométrico en el canvas | Ultrasonido HC-SR04 |
+| `millis()`       | `Date.now()` del navegador           | Registro interno del microcontrolador           |
+| `random()`       | `Math.floor(Math.random() * ...)`    | `random()` de Arduino                           |
+| Sensores         | Raycast geométrico en el canvas      | Ultrasonido HC-SR04                             |
 
 > Los valores numéricos (distancias en cm, tiempos en ms) **deben calibrarse empíricamente** en el hardware real — el simulador valida la lógica de estados, no los valores exactos.
 
@@ -154,6 +154,7 @@ El código del simulador y el del Arduino son **idénticos**. La única diferenc
 ## 🗺️ Mapa del simulador
 
 El entorno simula el piso de un aula con objetos dispersos:
+
 - **Paredes del aula**: bordes rectangulares del canvas (1200×900px)
 - **Cajas** (libros, mochilas): obstáculos rectangulares
 - **Objetos redondos** (tachos, columnas): obstáculos circulares
