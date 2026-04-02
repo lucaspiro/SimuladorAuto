@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ejemplo de Uso - Simulador</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background: #0d1117;
+        color: #c9d1d9;
+        font-family: 'Inter', sans-serif;
+        padding: 40px 60px;
+        line-height: 1.7;
+      }
+      h1 {
+        color: #58a6ff;
+        font-size: 2rem;
+        margin-bottom: 10px;
+      }
+      .subtitle {
+        color: #8b949e;
+        margin-bottom: 40px;
+        font-size: 14px;
+      }
+      .back-link {
+        display: inline-block;
+        color: #58a6ff;
+        text-decoration: none;
+        margin-bottom: 30px;
+        font-size: 14px;
+        transition: opacity 0.2s;
+      }
+      .back-link:hover { opacity: 0.7; }
+
+      h2 {
+        color: #e6edf3;
+        font-size: 1.2rem;
+        margin: 35px 0 15px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+      h3 {
+        color: #79c0ff;
+        font-size: 1rem;
+        margin: 25px 0 10px 0;
+      }
+      p { margin-bottom: 12px; color: #8b949e; font-size: 14px; }
+
+      pre {
+        background: #010409;
+        border: 1px solid rgba(240,246,252,0.1);
+        border-radius: 8px;
+        padding: 20px;
+        overflow-x: auto;
+        margin: 10px 0 20px 0;
+      }
+      pre code {
+        font-family: 'Fira Code', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #e6edf3;
+      }
+      .comment { color: #8b949e; }
+      .keyword { color: #ff7b72; }
+      .function { color: #d2a8ff; }
+      .string { color: #a5d6ff; }
+      .number { color: #79c0ff; }
+
+      .tip {
+        background: rgba(35, 134, 54, 0.15);
+        border: 1px solid rgba(35, 134, 54, 0.3);
+        border-radius: 8px;
+        padding: 15px 20px;
+        margin: 20px 0;
+        font-size: 13px;
+        color: #7ee787;
+      }
+      .warning {
+        background: rgba(210, 153, 34, 0.1);
+        border: 1px solid rgba(210, 153, 34, 0.3);
+        border-radius: 8px;
+        padding: 15px 20px;
+        margin: 20px 0;
+        font-size: 13px;
+        color: #e3b341;
+      }
+
+      .api-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0 25px 0;
+      }
+      .api-table th {
+        text-align: left;
+        padding: 10px 15px;
+        background: #161b22;
+        color: #58a6ff;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+      .api-table td {
+        padding: 10px 15px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        font-size: 13px;
+      }
+      .api-table td code {
+        font-family: 'Fira Code', monospace;
+        color: #79c0ff;
+        background: rgba(118, 192, 255, 0.1);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      .api-table td:last-child { color: #8b949e; }
+    </style>
+</head>
+<body>
+
+  <a href="index.html" class="back-link">← Volver al simulador</a>
+  <h1>📖 Ejemplo de Uso</h1>
+  <p class="subtitle">Guía básica para programar tu robot en el simulador de esquiva de obstáculos</p>
+
+  <!-- ======================= -->
+  <h2>1. ¿Cómo funciona?</h2>
+  <p>
+    Tu código se ejecuta <strong>en cada frame</strong> (60 veces por segundo). 
+    Dentro tenés acceso a los sensores, las funciones de movimiento y las variables de estado. 
+    Pensá que tu código reemplaza al <code>void loop()</code> de Arduino.
+  </p>
+
+  <div class="tip">
+    💡 <strong>Tip:</strong> Usá <code>millis()</code> en vez de <code>delay()</code>. 
+    El simulador no soporta delay porque bloquearía el navegador.
+  </div>
+
+  <!-- ======================= -->
+  <h2>2. Referencia de APIs</h2>
+
+  <h3>🚗 Funciones de movimiento</h3>
+  <table class="api-table">
+    <tr><th>Función</th><th>Descripción</th></tr>
+    <tr><td><code>avanzar()</code></td><td>Mueve el robot hacia adelante</td></tr>
+    <tr><td><code>retroceder()</code></td><td>Mueve el robot hacia atrás</td></tr>
+    <tr><td><code>girarDer()</code></td><td>Gira sobre su eje a la derecha</td></tr>
+    <tr><td><code>girarIzq()</code></td><td>Gira sobre su eje a la izquierda</td></tr>
+    <tr><td><code>parar()</code></td><td>Detiene ambos motores</td></tr>
+  </table>
+
+  <h3>📡 Sensores</h3>
+  <table class="api-table">
+    <tr><th>Variable</th><th>Descripción</th></tr>
+    <tr><td><code>sensor_frontal</code></td><td>Distancia al obstáculo más cercano adelante (0 a 250)</td></tr>
+    <tr><td><code>sensor_izquierdo</code></td><td>Distancia al obstáculo a la izquierda (0 a 250)</td></tr>
+    <tr><td><code>sensor_derecho</code></td><td>Distancia al obstáculo a la derecha (0 a 250)</td></tr>
+  </table>
+
+  <h3>🏷️ Estados</h3>
+  <table class="api-table">
+    <tr><th>Constante</th><th>Uso</th></tr>
+    <tr><td><code>AVANZAR</code></td><td>Estado por defecto, el robot avanza</td></tr>
+    <tr><td><code>GIRAR_D</code></td><td>Corrección: girando a la derecha</td></tr>
+    <tr><td><code>GIRAR_I</code></td><td>Corrección: girando a la izquierda</td></tr>
+    <tr><td><code>RETROCEDER</code></td><td>Marcha atrás por un tiempo definido</td></tr>
+    <tr><td><code>GIRAR_ESTRAT_I</code></td><td>Giro estratégico izquierda (con temporizador)</td></tr>
+    <tr><td><code>GIRAR_ESTRAT_D</code></td><td>Giro estratégico derecha (con temporizador)</td></tr>
+  </table>
+
+  <h3>🔧 Variables de control</h3>
+  <table class="api-table">
+    <tr><th>Variable</th><th>Descripción</th></tr>
+    <tr><td><code>estado</code></td><td>Contiene el estado actual (ej: <code>estado = AVANZAR</code>)</td></tr>
+    <tr><td><code>tControl</code></td><td>Guarda el momento en que se entró al estado</td></tr>
+    <tr><td><code>tDuracion</code></td><td>Cuántos milisegundos dura el estado actual</td></tr>
+  </table>
+
+  <h3>⏱️ Utilidades</h3>
+  <table class="api-table">
+    <tr><th>Función</th><th>Descripción</th></tr>
+    <tr><td><code>millis()</code></td><td>Devuelve los milisegundos transcurridos (como en Arduino)</td></tr>
+    <tr><td><code>random(min, max)</code></td><td>Devuelve un número entero aleatorio entre min y max-1</td></tr>
+  </table>
+
+  <!-- ======================= -->
+  <h2>3. Ejemplo simple: Avanzar y esquivar</h2>
+  <p>Este es el código más básico para que el robot avance y, cuando detecte algo de frente, retroceda y gire:</p>
+
+<pre><code><span class="comment">// Ejemplo básico: avanzar y esquivar</span>
+
+<span class="keyword">switch</span> (estado) {
+
+<span class="keyword">case</span> AVANZAR:
+  <span class="function">avanzar</span>();
+  <span class="comment">// Si hay algo cerca de frente, retroceder</span>
+  <span class="keyword">if</span> (sensor_frontal < <span class="number">60</span>) {
+    estado = RETROCEDER;
+    tControl = <span class="function">millis</span>();
+    tDuracion = <span class="number">500</span>;
+  }
+  <span class="keyword">break</span>;
+
+<span class="keyword">case</span> RETROCEDER:
+  <span class="function">retroceder</span>();
+  <span class="keyword">if</span> (<span class="function">millis</span>() - tControl >= tDuracion) {
+    <span class="comment">// Giro random para no repetir siempre lo mismo</span>
+    <span class="keyword">if</span> (<span class="function">random</span>(<span class="number">0</span>, <span class="number">2</span>) === <span class="number">0</span>) {
+      estado = GIRAR_ESTRAT_I;
+    } <span class="keyword">else</span> {
+      estado = GIRAR_ESTRAT_D;
+    }
+    tDuracion = <span class="number">300</span>;
+    tControl = <span class="function">millis</span>();
+  }
+  <span class="keyword">break</span>;
+
+<span class="keyword">case</span> GIRAR_ESTRAT_I:
+  <span class="function">girarIzq</span>();
+  <span class="keyword">if</span> (<span class="function">millis</span>() - tControl >= tDuracion) {
+    estado = AVANZAR;
+  }
+  <span class="keyword">break</span>;
+
+<span class="keyword">case</span> GIRAR_ESTRAT_D:
+  <span class="function">girarDer</span>();
+  <span class="keyword">if</span> (<span class="function">millis</span>() - tControl >= tDuracion) {
+    estado = AVANZAR;
+  }
+  <span class="keyword">break</span>;
+}</code></pre>
+
+  <div class="warning">
+    ⚠️ <strong>Importante:</strong> Este ejemplo es intencionalmente simple y básico. 
+    No usa los sensores laterales ni tiene corrección de centrado. 
+    ¡Tu desafío es mejorarlo para que esquive mejor!
+  </div>
+
+  <!-- ======================= -->
+  <h2>4. Patrón clave: millis() en vez de delay()</h2>
+  <p>En Arduino real usarías <code>delay(1000)</code> para esperar 1 segundo. Acá no se puede porque bloquea todo. 
+  En su lugar, usamos este patrón:</p>
+
+<pre><code><span class="comment">// ❌ MAL - No funciona en el simulador:</span>
+<span class="function">retroceder</span>();
+<span class="function">delay</span>(<span class="number">1000</span>);  <span class="comment">// Bloquea todo</span>
+
+<span class="comment">// ✅ BIEN - Patrón con millis():</span>
+<span class="keyword">case</span> RETROCEDER:
+  <span class="function">retroceder</span>();
+  <span class="keyword">if</span> (<span class="function">millis</span>() - tControl >= <span class="number">1000</span>) {
+    <span class="comment">// Ya pasó 1 segundo, cambiar estado</span>
+    estado = AVANZAR;
+  }
+  <span class="keyword">break</span>;</code></pre>
+
+  <div class="tip">
+    💡 <strong>Tip:</strong> Guardá <code>tControl = millis()</code> cuando entrás al estado, 
+    y después chequeá si ya pasó el tiempo comparando <code>millis() - tControl >= tDuracion</code>.
+  </div>
+
+  <br><br>
+  <a href="index.html" class="back-link">← Volver al simulador</a>
+  <br><br>
+
+</body>
+</html>

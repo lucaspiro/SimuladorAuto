@@ -1,0 +1,18 @@
+# Archivos internos / soluciones / borradores
+5ta_evitar_obstaculos_solucion.ino
+ab.ino
+codigo_simulador.ino
+index_lindo.html
+engram_export.md
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

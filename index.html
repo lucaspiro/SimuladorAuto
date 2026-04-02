@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulador - Esquiva obstáculos</title>
+    <!-- Incluimos p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <!-- Incluimos tipografías modernas de Google -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #0d1117; /* GitHub Dark background */
+        color: #c9d1d9;
+        font-family: 'Inter', sans-serif;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Área de la Simulación que ocupará el centro/izquierda */
+      #canvas-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Un patrón de cuadrícula opaco "blueprint" */
+        background-image: 
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        position: relative;
+      }
+
+      canvas {
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(88, 166, 255, 0.15);
+        border-radius: 8px;
+      }
+
+      /* Panel Lateral Derecha */
+      #side-panel {
+        width: 420px;
+        min-width: 420px;
+        background: rgba(22, 27, 34, 0.85); 
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-left: 1px solid rgba(255,255,255,0.08);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+        z-index: 10;
+        overflow-y: auto;
+      }
+
+      h1 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-top: 0;
+        margin-bottom: 20px;
+        color: #58a6ff;
+        text-shadow: 0 0 20px rgba(88, 166, 255, 0.3);
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      button {
+        background: #238636;
+        color: white;
+        border: 1px solid rgba(240, 246, 252, 0.1);
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex: 1;
+      }
+
+      button:hover { background: #2ea043; border-color: rgba(240, 246, 252, 0.2); transform: translateY(-1px); }
+      button:active { transform: translateY(1px); }
+      
+      button.stop-btn { background: #da3633; }
+      button.stop-btn:hover { background: #f85149; }
+      
+      button.refresh-btn { background: #21262d; }
+      button.refresh-btn:hover { background: #30363d; }
+
+      .editor-wrapper {
+        flex: 1;
+        min-height: 350px; /* Asegurar alto suficiente */
+        flex-shrink: 0;    /* Evitar que flexbox lo comprima a menos de esto */
+        display: flex;
+        flex-direction: column;
+        background: #010409;
+        border: 1px solid rgba(240,246,252,0.1);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+
+      .editor-header {
+        background: #161b22;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-family: 'Fira Code', monospace;
+        color: #8b949e;
+        border-bottom: 1px solid rgba(240,246,252,0.1);
+      }
+
+      textarea#code {
+        flex: 1;
+        min-height: 300px;
+        width: 100%;
+        background: transparent;
+        color: #e6edf3;
+        border: none;
+        padding: 15px;
+        font-family: 'Fira Code', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        resize: none;
+        outline: none;
+        box-sizing: border-box;
+      }
+
+      textarea#code::selection {
+        background: rgba(88, 166, 255, 0.3);
+      }
+
+      .api-reference {
+        margin-top: 15px;
+        font-size: 12px;
+        color: #8b949e;
+        background: #0d1117;
+        padding: 15px;
+        border-radius: 6px;
+        border: 1px solid rgba(240, 246, 252, 0.1);
+        line-height: 1.6;
+      }
+
+      .api-reference code {
+        color: #79c0ff;
+        font-family: 'Fira Code', monospace;
+        background: rgba(118, 192, 255, 0.1);
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+    </style>
+</head>
+<body>
+
+  <!-- Contenedor donde p5.js inyectará dinámicamente el canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- Panel lateral rígido de la derecha -->
+  <div id="side-panel">
+    <h1>Simulador Esquiva obstáculos</h1>
+    
+    <div class="controls">
+      <button onclick="runCode()" title="Ejecutar lógica">▶ Ejecutar</button>
+      <button class="stop-btn" onclick="detenerEjecucion()">&#10074;&#10074; Pausa</button>
+      <button class="refresh-btn" onclick="reiniciar()">&#8635; Restart</button>
+    </div>
+
+    <div class="editor-wrapper">
+      <div class="editor-header">📝 editor.ino</div>
+      <textarea id="code" spellcheck="false">
+// PEGA AQUÍ LA LÓGICA DE TU ARDUINO
+// Este es un pseudo-IDE...
+
+
+</textarea>
+    </div>
+
+    <div class="api-reference">
+      <strong>⚙️ Referencia Completa:</strong><br><br>
+      
+      <strong>🚗 Funciones de movimiento:</strong><br>
+      <code>avanzar()</code> — Avanza recto<br>
+      <code>retroceder()</code> — Marcha atrás<br>
+      <code>girarDer()</code> — Gira a la derecha<br>
+      <code>girarIzq()</code> — Gira a la izquierda<br>
+      <code>parar()</code> — Frena los motores<br><br>
+      
+      <strong>📡 Sensores (variables globales):</strong><br>
+      <code>sensor_frontal</code> — Distancia al frente (0-250)<br>
+      <code>sensor_izquierdo</code> — Distancia a la izquierda<br>
+      <code>sensor_derecho</code> — Distancia a la derecha<br><br>
+
+      <strong>🏷️ Estados (constantes):</strong><br>
+      <code>AVANZAR</code>, <code>GIRAR_D</code>, <code>GIRAR_I</code><br>
+      <code>RETROCEDER</code><br>
+      <code>GIRAR_ESTRAT_I</code>, <code>GIRAR_ESTRAT_D</code><br><br>
+
+      <strong>🔧 Variables de control:</strong><br>
+      <code>estado</code> — Estado actual del robot<br>
+      <code>tControl</code> — Marca de tiempo del estado<br>
+      <code>tDuracion</code> — Duración del estado actual<br><br>
+
+      <strong>⏱️ Utilidades:</strong><br>
+      <code>millis()</code> — Milisegundos desde el inicio<br>
+      <code>random(min, max)</code> — Número entero aleatorio<br><br>
+      
+      <a href="ejemplo.html" target="_blank" style="color:#58a6ff; text-decoration:none;">📖 Ver ejemplo de uso →</a>
+    </div>
+
+    <!-- PANEL DE RECORDS -->
+    <div class="records-wrapper" style="margin-top: 15px; flex: none; display:flex; flex-direction:column; background: #010409; border-radius: 6px; border: 1px solid rgba(240, 246, 252, 0.1); padding: 15px; font-size: 13px; max-height: 250px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+        <strong style="color: #8b949e;">⏱ Historial de Intentos</strong>
+        <button onclick="limpiarRecords()" style="flex:none; background:transparent; color:#f85149; border:none; padding:0; cursor:pointer; font-size:12px; font-weight:normal; text-decoration:underline;">Limpiar</button>
+      </div>
+      <div id="records-list" style="overflow-y: auto; flex:1;">
+        <!-- Se rellena desde JS -->
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
