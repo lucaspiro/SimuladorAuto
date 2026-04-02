@@ -17,8 +17,9 @@ var sensor_derecho = 0;
 var sensor_izquierdo = 0;
 
 var chocoMsg = 0; // Temporizador del popup de choque
-var tiempoInicio = 0; // Timestamp de cuando se empezó a ejecutar
-var tiempoChoque = 0; // Tiempo que duró antes de chocar
+var tiempoInicio = 0;    // Timestamp de cuando se reanudó por última vez
+var tiempoAcumulado = 0; // Segundos ya corridos antes de la última pausa
+var tiempoChoque = 0;    // Tiempo que duró antes de chocar
 
 // --- MAPA: Objetos tirados en el piso de un aula ---
 var walls = [
@@ -80,10 +81,13 @@ function runCode() {
       "GIRAR_ESTRAT_I", "GIRAR_ESTRAT_D", "millis", "random", code
     );
     ejecutando = true;
-    tiempoInicio = Date.now();
+    // Solo reseteamos el tiempo si no había nada acumulado (primera vez o tras reiniciar)
     tiempoChoque = 0;
+    tiempoInicio = Date.now(); // Marcamos el momento en que se reanuda
+    document.getElementById('btn-play').disabled = true;
   } catch (e) {
     alert("Error de sintaxis: " + e.message);
+    document.getElementById('btn-play').disabled = false;
   }
 }
 
@@ -93,8 +97,10 @@ function reiniciar() {
   ejecutando = false;
   parar();
   tiempoInicio = 0;
+  tiempoAcumulado = 0;
   tiempoChoque = 0;
   chocoMsg = 0;
+  document.getElementById('btn-play').disabled = false;
 }
 
 // --- FÍSICA ---
@@ -248,7 +254,10 @@ function drawDebug() {
   if (tiempoChoque > 0) {
     segs = tiempoChoque;
   } else if (tiempoInicio > 0) {
-    segs = (Date.now() - tiempoInicio) / 1000;
+    // Acumulado de sesiones anteriores + lo que lleva corriendo ahora
+    segs = tiempoAcumulado + (ejecutando ? (Date.now() - tiempoInicio) / 1000 : 0);
+  } else {
+    segs = tiempoAcumulado;
   }
   let tiempoStr = formatTime(segs);
   
@@ -259,7 +268,15 @@ function drawDebug() {
   textAlign(LEFT, BASELINE);
 }
 
-function detenerEjecucion() { ejecutando = false; parar(); }
+function detenerEjecucion() {
+  if (ejecutando) {
+    // Guardar el tiempo corrido hasta ahora antes de pausar
+    tiempoAcumulado += (Date.now() - tiempoInicio) / 1000;
+  }
+  ejecutando = false;
+  parar();
+  document.getElementById('btn-play').disabled = false;
+}
 
 function control() {
   if (!ejecutando) return;
@@ -297,7 +314,9 @@ function draw() {
 
   // Chequear colisión del cuerpo
   if (ejecutando && robotChoca()) {
-    tiempoChoque = (Date.now() - tiempoInicio) / 1000;
+    // El tiempo total es lo acumulado + lo que corrió desde el último play
+    tiempoChoque = tiempoAcumulado + (Date.now() - tiempoInicio) / 1000;
+    tiempoAcumulado = 0; // Reset para el próximo intento
     chocoMsg = 120; // ~2 segundos a 60fps
     parar();
     guardarRecord(tiempoChoque); // Guardar en persistencia

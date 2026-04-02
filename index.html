@@ -87,7 +87,17 @@
       }
 
       button:hover { background: #2ea043; border-color: rgba(240, 246, 252, 0.2); transform: translateY(-1px); }
-      button:active { transform: translateY(1px); }
+      button:active:not(:disabled) { transform: translateY(1px); }
+      
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      button:disabled:hover {
+        background: #238636;
+        transform: translateY(0);
+        border-color: rgba(240, 246, 252, 0.1);
+      }
       
       button.stop-btn { background: #da3633; }
       button.stop-btn:hover { background: #f85149; }
@@ -166,7 +176,7 @@
     <h1>Simulador Esquiva obstáculos</h1>
     
     <div class="controls">
-      <button onclick="runCode()" title="Ejecutar lógica">▶ Ejecutar</button>
+      <button id="btn-play" onclick="runCode()" title="Ejecutar lógica">▶ Ejecutar</button>
       <button class="stop-btn" onclick="detenerEjecucion()">&#10074;&#10074; Pausa</button>
       <button class="refresh-btn" onclick="reiniciar()">&#8635; Restart</button>
     </div>
