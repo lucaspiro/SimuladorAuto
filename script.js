@@ -37,6 +37,7 @@ var enReplay = false;
 var replayFrames = [];      // Snapshot lineal del buffer al momento del choque
 var replayFrameActual = 0;
 var replayVelocidad = 1;    // Multiplicador de velocidad del replay
+var robotRealPos = null;    // Posición real del robot guardada antes de entrar al replay
 
 // --- MAPA: Objetos tirados en el piso de un aula ---
 var walls = [
@@ -91,6 +92,11 @@ function randomArduino(min, max) {
 
 // --- COMPILADOR DEL CÓDIGO DEL ALUMNO ---
 function runCode() {
+  // Si estamos en replay, cerrarlo para que se vea el auto funcionando
+  if (enReplay) {
+    detenerReplay();
+  }
+
   let code = document.getElementById("code").value;
   try {
     studentControl = new Function(
@@ -386,7 +392,10 @@ function draw() {
     tiempoChoque = tiempoAcumulado + (Date.now() - tiempoInicio) / 1000;
     tiempoAcumulado = 0;
     chocoMsg = 120; // ~2 segundos a 60fps
+    // Detener ejecución para que se pueda ver el replay inmediatamente
+    ejecutando = false;
     parar();
+    document.getElementById('btn-play').disabled = false;
     // Capturar el replay antes de reiniciar
     let framesGuardados = capturarReplayActual();
     guardarRecord(tiempoChoque, framesGuardados);
@@ -403,13 +412,16 @@ function draw() {
 
 function iniciarReplay(frames) {
   if (ejecutando) {
-    alert("Pausá la simulación primero para ver el replay.");
-    return;
+    // Si está ejecutando, pausar la simulación para poder ver el replay
+    detenerEjecucion();
   }
   if (!frames || frames.length === 0) {
     alert("No hay frames de replay guardados.");
     return;
   }
+  // Guardar posición real del robot antes de pisar con el replay
+  robotRealPos = { x: robot.x, y: robot.y, theta: robot.theta };
+
   enReplay = true;
   replayFrames = frames;
   replayFrameActual = 0;
@@ -425,6 +437,14 @@ function detenerReplay() {
   replayFrames = [];
   replayFrameActual = 0;
   document.getElementById('replay-overlay').style.display = 'none';
+
+  // Restaurar la posición real del robot que tenía antes del replay
+  if (robotRealPos) {
+    robot.x = robotRealPos.x;
+    robot.y = robotRealPos.y;
+    robot.theta = robotRealPos.theta;
+    robotRealPos = null;
+  }
 }
 
 function drawReplay() {
@@ -437,19 +457,22 @@ function drawReplay() {
     }
   }
 
-  // Calcular el tiempo del replay (en segundos) desde el inicio del array
-  let segsDesdeInicio = (replayFrameActual / REPLAY_FPS);
-  let segsTotal = (totalFrames / REPLAY_FPS);
-  
   // Dibujar "fantasma" de la trayectoria (trail)
   drawReplayTrail(replayFrameActual);
 
-  // Dibujar robot en la posición actual del replay
+  // Sincronizar posición del robot global con el frame actual del replay
+  // para que los sensores se calculen correctamente
   let f = replayFrames[replayFrameActual];
-  drawRobot(f.x, f.y, f.theta, 255);
+  robot.x = f.x;
+  robot.y = f.y;
+  robot.theta = f.theta;
 
-  // HUD del replay
-  drawReplayHUD(segsDesdeInicio, segsTotal, totalFrames);
+  // Calcular y dibujar sensores de distancia
+  medirSensores();
+  drawSensors();
+
+  // Dibujar robot en la posición actual del replay
+  drawRobot(f.x, f.y, f.theta, 255);
 
   // Avanzar frame
   for (let i = 0; i < replayVelocidad; i++) {
@@ -479,46 +502,8 @@ function drawReplayTrail(frameActual) {
   }
 }
 
-function drawReplayHUD(segsActual, segsTotal, totalFrames) {
-  // Banner superior "REPLAY"
-  rectMode(CORNER);
-  fill(0, 0, 0, 160);
-  noStroke();
-  rect(0, 0, 1200, 60);
-
-  // Texto REPLAY
-  fill(255, 200, 0);
-  textAlign(LEFT, CENTER);
-  textSize(22);
-  text("⏮ REPLAY — Últimos " + min(segsTotal, REPLAY_SEGUNDOS).toFixed(0) + "s antes del choque", 20, 30);
-
-  // Tiempo actual
-  textAlign(RIGHT, CENTER);
-  textSize(18);
-  fill(200, 200, 200);
-  text(formatTime(segsActual) + " / " + formatTime(segsTotal), 1180, 30);
-
-  // Velocidad
-  textAlign(CENTER, CENTER);
-  textSize(14);
-  fill(150, 255, 150);
-  text("Velocidad: " + replayVelocidad + "x", 600, 30);
-
-  // Barra de progreso
-  let progresoX = totalFrames > 1 ? replayFrameActual / (totalFrames - 1) : 0;
-  fill(40, 40, 40, 200);
-  noStroke();
-  rect(20, 48, 1160, 8, 4);
-  fill(255, 200, 0);
-  rect(20, 48, progresoX * 1160, 8, 4);
-
-  // Indicador choque (al final)
-  fill(255, 80, 80);
-  ellipse(20 + 1160, 52, 12, 12);
-
-  textAlign(LEFT, BASELINE);
-  rectMode(CORNER);
-}
+// drawReplayHUD eliminado: la franja superior tapaba el auto.
+// Toda la info del replay se muestra en el overlay HTML inferior.
 
 function actualizarBarraReplay(frame, total) {
   let pct = total > 1 ? (frame / (total - 1)) * 100 : 0;
