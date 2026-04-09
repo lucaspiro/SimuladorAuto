@@ -1,6 +1,7 @@
 // ============================================================
 // SIMULADOR ROBOT-COCHE — Motor Principal
 // Base: autoObstaculos (funcional) + Estética Neón + Obstáculos sueltos
+// + Sistema de Replay: graba los 10 segundos antes del choque
 // ============================================================
 
 // --- VARIABLES GLOBALES ---
@@ -20,6 +21,22 @@ var chocoMsg = 0; // Temporizador del popup de choque
 var tiempoInicio = 0;    // Timestamp de cuando se reanudó por última vez
 var tiempoAcumulado = 0; // Segundos ya corridos antes de la última pausa
 var tiempoChoque = 0;    // Tiempo que duró antes de chocar
+
+// --- SISTEMA DE REPLAY ---
+const REPLAY_FPS = 60;
+const REPLAY_SEGUNDOS = 10;
+const REPLAY_MAX_FRAMES = REPLAY_FPS * REPLAY_SEGUNDOS; // 600 frames
+
+// Buffer circular que graba posiciones continuamente
+var replayBuffer = [];      // Array of {x, y, theta}
+var replayBufferIdx = 0;    // Índice de escritura circular
+var replayBufferFull = false; // Si ya llenamos el buffer al menos una vez
+
+// Para el modo de reproducción
+var enReplay = false;
+var replayFrames = [];      // Snapshot lineal del buffer al momento del choque
+var replayFrameActual = 0;
+var replayVelocidad = 1;    // Multiplicador de velocidad del replay
 
 // --- MAPA: Objetos tirados en el piso de un aula ---
 var walls = [
@@ -92,6 +109,11 @@ function runCode() {
 }
 
 function reiniciar() {
+  // Si estamos en replay, cancelarlo
+  if (enReplay) {
+    detenerReplay();
+  }
+
   robot = createRobot();
   estado = AVANZAR;
   ejecutando = false;
@@ -101,6 +123,11 @@ function reiniciar() {
   tiempoChoque = 0;
   chocoMsg = 0;
   document.getElementById('btn-play').disabled = false;
+
+  // Reiniciar buffer de replay
+  replayBuffer = [];
+  replayBufferIdx = 0;
+  replayBufferFull = false;
 }
 
 // --- FÍSICA ---
@@ -112,6 +139,33 @@ function updateRobot() {
   robot.theta += w;
   if (robot.theta > Math.PI * 2) robot.theta -= Math.PI * 2;
   if (robot.theta < -Math.PI * 2) robot.theta += Math.PI * 2;
+}
+
+// --- BUFFER DE REPLAY: Grabar frame actual ---
+function grabarFrameReplay() {
+  if (!ejecutando) return;
+  let frame = { x: robot.x, y: robot.y, theta: robot.theta };
+  if (replayBuffer.length < REPLAY_MAX_FRAMES) {
+    replayBuffer.push(frame);
+  } else {
+    // Buffer circular: reemplazamos el frame más antiguo
+    replayBuffer[replayBufferIdx] = frame;
+    replayBufferFull = true;
+  }
+  replayBufferIdx = (replayBufferIdx + 1) % REPLAY_MAX_FRAMES;
+}
+
+// Extrae el buffer circular como array lineal (del más antiguo al más nuevo)
+function capturarReplayActual() {
+  if (!replayBufferFull) {
+    // El buffer aún no está lleno: retornar todo lo grabado
+    return [...replayBuffer];
+  } else {
+    // Buffer circular lleno: reordenar desde el más antiguo
+    let parte1 = replayBuffer.slice(replayBufferIdx); // desde el más antiguo
+    let parte2 = replayBuffer.slice(0, replayBufferIdx);
+    return parte1.concat(parte2);
+  }
 }
 
 // --- DETECCIÓN DE COLISIÓN DEL CUERPO ---
@@ -194,20 +248,26 @@ function medirSensores() {
 }
 
 // --- DIBUJO ---
-function drawRobot() {
+function drawRobot(rx, ry, rtheta, alpha) {
+  // Parámetros opcionales: si no se pasan, usa el robot actual
+  let px = (rx !== undefined) ? rx : robot.x;
+  let py = (ry !== undefined) ? ry : robot.y;
+  let pt = (rtheta !== undefined) ? rtheta : robot.theta;
+  let al = (alpha !== undefined) ? alpha : 255;
+
   push();
-  translate(robot.x, robot.y);
-  rotate(robot.theta);
+  translate(px, py);
+  rotate(pt);
   rectMode(CENTER);
   // Chasis
-  fill(30, 40, 50); stroke(88, 166, 255); strokeWeight(2);
+  fill(30, 40, 50, al); stroke(88, 166, 255, al); strokeWeight(2);
   rect(0, 0, 32, 22, 4);
   // Ruedas
-  fill(20); noStroke();
+  fill(20, 20, 20, al); noStroke();
   rect(-8, -13, 14, 4);
   rect(-8, 13, 14, 4);
   // LED delantero
-  fill(255, 80, 80); noStroke();
+  fill(255, 80, 80, al); noStroke();
   ellipse(12, 0, 7, 7);
   pop();
 }
@@ -254,7 +314,6 @@ function drawDebug() {
   if (tiempoChoque > 0) {
     segs = tiempoChoque;
   } else if (tiempoInicio > 0) {
-    // Acumulado de sesiones anteriores + lo que lleva corriendo ahora
     segs = tiempoAcumulado + (ejecutando ? (Date.now() - tiempoInicio) / 1000 : 0);
   } else {
     segs = tiempoAcumulado;
@@ -270,12 +329,13 @@ function drawDebug() {
 
 function detenerEjecucion() {
   if (ejecutando) {
-    // Guardar el tiempo corrido hasta ahora antes de pausar
     tiempoAcumulado += (Date.now() - tiempoInicio) / 1000;
   }
   ejecutando = false;
   parar();
   document.getElementById('btn-play').disabled = false;
+  // Actualizar botones de replay en el historial
+  renderRecords();
 }
 
 function control() {
@@ -297,6 +357,12 @@ function draw() {
   clear();
   drawWalls();
 
+  // -------- MODO REPLAY --------
+  if (enReplay) {
+    drawReplay();
+    return;
+  }
+
   // Si está en estado de choque, mostrar popup y no hacer nada más
   if (chocoMsg > 0) {
     drawRobot();
@@ -308,23 +374,176 @@ function draw() {
     return;
   }
 
+  // Grabar posición actual antes de actualizar (solo si está ejecutando)
+  grabarFrameReplay();
+
   medirSensores();
   control();
   updateRobot();
 
   // Chequear colisión del cuerpo
   if (ejecutando && robotChoca()) {
-    // El tiempo total es lo acumulado + lo que corrió desde el último play
     tiempoChoque = tiempoAcumulado + (Date.now() - tiempoInicio) / 1000;
-    tiempoAcumulado = 0; // Reset para el próximo intento
+    tiempoAcumulado = 0;
     chocoMsg = 120; // ~2 segundos a 60fps
     parar();
-    guardarRecord(tiempoChoque); // Guardar en persistencia
+    // Capturar el replay antes de reiniciar
+    let framesGuardados = capturarReplayActual();
+    guardarRecord(tiempoChoque, framesGuardados);
   }
 
   drawRobot();
   drawSensors();
   drawDebug();
+}
+
+// ============================================================
+// SISTEMA DE REPLAY
+// ============================================================
+
+function iniciarReplay(frames) {
+  if (ejecutando) {
+    alert("Pausá la simulación primero para ver el replay.");
+    return;
+  }
+  if (!frames || frames.length === 0) {
+    alert("No hay frames de replay guardados.");
+    return;
+  }
+  enReplay = true;
+  replayFrames = frames;
+  replayFrameActual = 0;
+  replayVelocidad = 1;
+
+  // Mostrar overlay de controles de replay
+  document.getElementById('replay-overlay').style.display = 'flex';
+  actualizarUIReplay();
+}
+
+function detenerReplay() {
+  enReplay = false;
+  replayFrames = [];
+  replayFrameActual = 0;
+  document.getElementById('replay-overlay').style.display = 'none';
+}
+
+function drawReplay() {
+  let totalFrames = replayFrames.length;
+  if (totalFrames === 0 || replayFrameActual >= totalFrames) {
+    // Replay terminó
+    if (replayFrameActual >= totalFrames && totalFrames > 0) {
+      // permanecer en el último frame
+      replayFrameActual = totalFrames - 1;
+    }
+  }
+
+  // Calcular el tiempo del replay (en segundos) desde el inicio del array
+  let segsDesdeInicio = (replayFrameActual / REPLAY_FPS);
+  let segsTotal = (totalFrames / REPLAY_FPS);
+  
+  // Dibujar "fantasma" de la trayectoria (trail)
+  drawReplayTrail(replayFrameActual);
+
+  // Dibujar robot en la posición actual del replay
+  let f = replayFrames[replayFrameActual];
+  drawRobot(f.x, f.y, f.theta, 255);
+
+  // HUD del replay
+  drawReplayHUD(segsDesdeInicio, segsTotal, totalFrames);
+
+  // Avanzar frame
+  for (let i = 0; i < replayVelocidad; i++) {
+    if (replayFrameActual < totalFrames - 1) {
+      replayFrameActual++;
+    }
+  }
+
+  actualizarBarraReplay(replayFrameActual, totalFrames);
+}
+
+function drawReplayTrail(frameActual) {
+  // Dibujar los últimos 60 frames como trail semitransparente
+  let trailLen = 60;
+  let desde = Math.max(0, frameActual - trailLen);
+  for (let i = desde; i <= frameActual; i++) {
+    let f = replayFrames[i];
+    let progresso = (i - desde) / trailLen;
+    let al = progresso * 120; // más opaco cerca del frame actual
+    
+    // Solo puntos del trail (sin dibujar todo el robot)
+    push();
+    noStroke();
+    fill(255, 200, 0, al);
+    ellipse(f.x, f.y, 5, 5);
+    pop();
+  }
+}
+
+function drawReplayHUD(segsActual, segsTotal, totalFrames) {
+  // Banner superior "REPLAY"
+  rectMode(CORNER);
+  fill(0, 0, 0, 160);
+  noStroke();
+  rect(0, 0, 1200, 60);
+
+  // Texto REPLAY
+  fill(255, 200, 0);
+  textAlign(LEFT, CENTER);
+  textSize(22);
+  text("⏮ REPLAY — Últimos " + min(segsTotal, REPLAY_SEGUNDOS).toFixed(0) + "s antes del choque", 20, 30);
+
+  // Tiempo actual
+  textAlign(RIGHT, CENTER);
+  textSize(18);
+  fill(200, 200, 200);
+  text(formatTime(segsActual) + " / " + formatTime(segsTotal), 1180, 30);
+
+  // Velocidad
+  textAlign(CENTER, CENTER);
+  textSize(14);
+  fill(150, 255, 150);
+  text("Velocidad: " + replayVelocidad + "x", 600, 30);
+
+  // Barra de progreso
+  let progresoX = totalFrames > 1 ? replayFrameActual / (totalFrames - 1) : 0;
+  fill(40, 40, 40, 200);
+  noStroke();
+  rect(20, 48, 1160, 8, 4);
+  fill(255, 200, 0);
+  rect(20, 48, progresoX * 1160, 8, 4);
+
+  // Indicador choque (al final)
+  fill(255, 80, 80);
+  ellipse(20 + 1160, 52, 12, 12);
+
+  textAlign(LEFT, BASELINE);
+  rectMode(CORNER);
+}
+
+function actualizarBarraReplay(frame, total) {
+  let pct = total > 1 ? (frame / (total - 1)) * 100 : 0;
+  let barraEl = document.getElementById('replay-barra');
+  if (barraEl) barraEl.value = pct;
+
+  let tiempoEl = document.getElementById('replay-tiempo');
+  if (tiempoEl) tiempoEl.textContent = formatTime(frame / REPLAY_FPS) + ' / ' + formatTime(total / REPLAY_FPS);
+}
+
+function actualizarUIReplay() {
+  let barraEl = document.getElementById('replay-barra');
+  if (barraEl) barraEl.value = 0;
+}
+
+// Saltar a un punto específico de la barra de progreso
+function seekReplay(valor) {
+  if (!enReplay || replayFrames.length === 0) return;
+  replayFrameActual = Math.floor((valor / 100) * (replayFrames.length - 1));
+}
+
+function cambiarVelocidadReplay(delta) {
+  replayVelocidad = Math.max(1, Math.min(8, replayVelocidad + delta));
+  let velEl = document.getElementById('replay-vel');
+  if (velEl) velEl.textContent = replayVelocidad + 'x';
 }
 
 function drawPopupChoque() {
@@ -351,7 +570,7 @@ function drawPopupChoque() {
   let tiempoStr = formatTime(tiempoChoque);
   
   textSize(22);
-  fill(255, 255, 150); // Amarillo suave para destacar
+  fill(255, 255, 150);
   text("Tiempo aguantado: " + tiempoStr, 600, 410);
 
   // Mensaje secundario
@@ -373,16 +592,27 @@ function formatTime(segs) {
   return (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs + '.' + ms;
 }
 
-function guardarRecord(segs) {
+function guardarRecord(segs, frames) {
   let records = JSON.parse(localStorage.getItem('robotRecords')) || [];
   let fecha = new Date();
   let horaStr = fecha.getHours().toString().padStart(2, '0') + ':' + fecha.getMinutes().toString().padStart(2, '0');
   
-  // Agregamos al final (orden cronológico)
-  records.push({ tiempo: segs, string: formatTime(segs), hora: horaStr });
+  // Comprimir frames para almacenamiento (reducir precisión decimal)
+  let framesComprimidos = frames.map(f => ({
+    x: Math.round(f.x * 10) / 10,
+    y: Math.round(f.y * 10) / 10,
+    t: Math.round(f.theta * 1000) / 1000
+  }));
+
+  records.push({ 
+    tiempo: segs, 
+    string: formatTime(segs), 
+    hora: horaStr, 
+    replay: framesComprimidos 
+  });
   
-  // Guardamos hasta los ultimos 50 intentos en la sesión
-  if(records.length > 50) records.shift();
+  // Guardamos hasta los últimos 20 intentos (con replay los datos son más grandes)
+  if (records.length > 20) records.shift();
   
   localStorage.setItem('robotRecords', JSON.stringify(records));
   renderRecords();
@@ -395,7 +625,7 @@ function limpiarRecords() {
 
 function renderRecords() {
   let listEl = document.getElementById('records-list');
-  if(!listEl) return;
+  if (!listEl) return;
   
   let records = JSON.parse(localStorage.getItem('robotRecords')) || [];
   if (records.length === 0) {
@@ -403,7 +633,7 @@ function renderRecords() {
     return;
   }
   
-  // Buscamos los 3 mejores tiempos históricos para destacarlos en la lista general
+  // Buscamos los 3 mejores tiempos históricos para destacarlos
   let clonRecords = [...records];
   clonRecords.sort((a, b) => b.tiempo - a.tiempo);
   let top1 = clonRecords.length > 0 ? clonRecords[0].tiempo : -1;
@@ -412,24 +642,97 @@ function renderRecords() {
   
   let html = '<ul style="padding: 0; margin: 0; list-style: none; color:#e6edf3; font-family: \'Fira Code\', monospace;">';
   
-  // Iteramos en reversa: los intentos más recientes primero (arriba) y los iniciales abajo
-  for(let i = records.length - 1; i >= 0; i--) {
+  for (let i = records.length - 1; i >= 0; i--) {
     let r = records[i];
     let icon = '🔹';
     let colorT = 'color:#58a6ff;';
     
-    // Asignamos trofeo una única vez a los 3 mejores (por si hay empates)
     if (r.tiempo === top1 && top1 > 0) { icon = '🏆'; colorT = 'color:#e3b341;'; top1 = -1; }
     else if (r.tiempo === top2 && top2 > 0) { icon = '🥈'; colorT = 'color:#d2a8ff;'; top2 = -1; }
     else if (r.tiempo === top3 && top3 > 0) { icon = '🥉'; colorT = 'color:#ff7b72;'; top3 = -1; }
-    else { colorT = 'color:#8b949e;'; } // Tiempos normales, un tono gris/azulado suave
+    else { colorT = 'color:#8b949e;'; }
+
+    // Botón de replay (solo visible si hay frames guardados)
+    let replayBtn = '';
+    if (r.replay && r.replay.length > 0) {
+      replayBtn = `<button 
+        id="replay-btn-${i}"
+        onclick="verReplayDelHistorial(${i})" 
+        title="Ver los últimos ${Math.min(REPLAY_SEGUNDOS, (r.replay.length / REPLAY_FPS).toFixed(0))}s antes del choque"
+        style="
+          flex:none; 
+          background: linear-gradient(135deg, rgba(255,200,0,0.15), rgba(255,130,0,0.15)); 
+          color: #ffa500; 
+          border: 1px solid rgba(255,165,0,0.4); 
+          padding: 2px 7px; 
+          border-radius: 4px; 
+          font-size: 11px; 
+          cursor: pointer; 
+          font-weight: bold;
+          transition: all 0.2s;
+          margin-left: 4px;
+          vertical-align: middle;
+        "
+        onmouseover="this.style.background='linear-gradient(135deg,rgba(255,200,0,0.35),rgba(255,130,0,0.35))'; this.style.borderColor='rgba(255,165,0,0.8)';"
+        onmouseout="this.style.background='linear-gradient(135deg,rgba(255,200,0,0.15),rgba(255,130,0,0.15))'; this.style.borderColor='rgba(255,165,0,0.4)';"
+      >⏮ Replay</button>`;
+    }
     
-    html += `<li style="margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">
-              <span style="display:inline-block; width:22px; text-align:center;">${icon}</span> 
-              <span style="${colorT} font-weight:bold;">${r.string}</span> 
-              <span style="color:#484f58; font-size:11px; float:right; margin-top:2px;">#${i+1} - ${r.hora}</span>
+    html += `<li style="margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; display:flex; align-items:center; justify-content:space-between;">
+              <span>
+                <span style="display:inline-block; width:22px; text-align:center;">${icon}</span> 
+                <span style="${colorT} font-weight:bold;">${r.string}</span>
+              </span>
+              <span style="display:flex; align-items:center; gap:4px;">
+                ${replayBtn}
+                <span style="color:#484f58; font-size:11px;">#${i+1} ${r.hora}</span>
+              </span>
              </li>`;
   }
   html += '</ul>';
   listEl.innerHTML = html;
+
+  // Actualizar estado de botones según si la sim está pausada
+  actualizarBotonesReplay();
+}
+
+// Actualizar estado habilitado/deshabilitado de todos los botones de replay
+function actualizarBotonesReplay() {
+  if (typeof ejecutando === 'undefined') return;
+  let records = JSON.parse(localStorage.getItem('robotRecords')) || [];
+  for (let i = 0; i < records.length; i++) {
+    let btn = document.getElementById('replay-btn-' + i);
+    if (!btn) continue;
+    if (ejecutando || enReplay) {
+      btn.disabled = true;
+      btn.style.opacity = '0.3';
+      btn.title = 'Pausá la simulación para ver el replay';
+      btn.style.cursor = 'not-allowed';
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.title = 'Ver replay del choque';
+      btn.style.cursor = 'pointer';
+    }
+  }
+}
+
+function verReplayDelHistorial(idx) {
+  if (ejecutando) {
+    alert("⏸ Pausá la simulación primero para ver el replay.");
+    return;
+  }
+  if (enReplay) {
+    detenerReplay();
+    return;
+  }
+  let records = JSON.parse(localStorage.getItem('robotRecords')) || [];
+  let r = records[idx];
+  if (!r || !r.replay || r.replay.length === 0) {
+    alert("No hay datos de replay para este intento.");
+    return;
+  }
+  // Descomprimir frames
+  let frames = r.replay.map(f => ({ x: f.x, y: f.y, theta: f.t }));
+  iniciarReplay(frames);
 }
