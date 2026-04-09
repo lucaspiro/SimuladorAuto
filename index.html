@@ -14,7 +14,7 @@
       body {
         margin: 0;
         padding: 0;
-        background-color: #0d1117; /* GitHub Dark background */
+        background-color: #0d1117;
         color: #c9d1d9;
         font-family: 'Inter', sans-serif;
         display: flex;
@@ -22,13 +22,12 @@
         overflow: hidden;
       }
 
-      /* Área de la Simulación que ocupará el centro/izquierda */
+      /* Área de la Simulación */
       #canvas-container {
         flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        /* Un patrón de cuadrícula opaco "blueprint" */
         background-image: 
           linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
           linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
@@ -107,8 +106,8 @@
 
       .editor-wrapper {
         flex: 1;
-        min-height: 350px; /* Asegurar alto suficiente */
-        flex-shrink: 0;    /* Evitar que flexbox lo comprima a menos de esto */
+        min-height: 350px;
+        flex-shrink: 0;
         display: flex;
         flex-direction: column;
         background: #010409;
@@ -164,12 +163,169 @@
         padding: 2px 4px;
         border-radius: 4px;
       }
+
+      /* ============================================
+         OVERLAY DE CONTROLES DE REPLAY
+         ============================================ */
+      #replay-overlay {
+        display: none; /* Oculto por defecto */
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 10px 20px;
+        background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 80%, transparent 100%);
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        z-index: 100;
+        pointer-events: none; /* El canvas sigue recibiendo eventos */
+      }
+
+      #replay-overlay > * {
+        pointer-events: auto;
+      }
+
+      .replay-controls-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        max-width: 900px;
+      }
+
+      #replay-barra {
+        flex: 1;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255,255,255,0.15);
+        outline: none;
+        cursor: pointer;
+        accent-color: #ffa500;
+      }
+
+      #replay-barra::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #ffa500;
+        cursor: pointer;
+        box-shadow: 0 0 8px rgba(255,165,0,0.6);
+      }
+
+      .replay-btn-ctrl {
+        background: rgba(255,165,0,0.2);
+        color: #ffa500;
+        border: 1px solid rgba(255,165,0,0.4);
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex: none;
+      }
+
+      .replay-btn-ctrl:hover {
+        background: rgba(255,165,0,0.4);
+        border-color: rgba(255,165,0,0.8);
+        transform: translateY(-1px);
+      }
+
+      .replay-btn-cerrar {
+        background: rgba(218,54,51,0.2);
+        color: #f85149;
+        border: 1px solid rgba(218,54,51,0.4);
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex: none;
+      }
+
+      .replay-btn-cerrar:hover {
+        background: rgba(218,54,51,0.4);
+        border-color: rgba(218,54,51,0.8);
+        transform: translateY(-1px);
+      }
+
+      #replay-tiempo {
+        color: #ffa500;
+        font-family: 'Fira Code', monospace;
+        font-size: 13px;
+        white-space: nowrap;
+        min-width: 110px;
+        text-align: center;
+      }
+
+      #replay-vel {
+        color: #90ee90;
+        font-family: 'Fira Code', monospace;
+        font-size: 13px;
+        min-width: 28px;
+        text-align: center;
+      }
+
+      .replay-tag {
+        color: #ffa500;
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 1px;
+        text-shadow: 0 0 10px rgba(255,165,0,0.5);
+        animation: replay-pulse 1.5s infinite alternate;
+      }
+
+      @keyframes replay-pulse {
+        from { opacity: 0.7; }
+        to   { opacity: 1; text-shadow: 0 0 16px rgba(255,165,0,0.9); }
+      }
     </style>
 </head>
 <body>
 
   <!-- Contenedor donde p5.js inyectará dinámicamente el canvas -->
-  <div id="canvas-container"></div>
+  <div id="canvas-container">
+
+    <!-- OVERLAY DE CONTROLES DE REPLAY (posicionado dentro del canvas-container) -->
+    <div id="replay-overlay">
+      <div class="replay-controls-row">
+        <span class="replay-tag">⏮ REPLAY</span>
+
+        <!-- Velocidad menos -->
+        <button class="replay-btn-ctrl" onclick="cambiarVelocidadReplay(-1)" title="Más lento">◀◀</button>
+
+        <!-- Velocidad indicator -->
+        <span id="replay-vel">1x</span>
+
+        <!-- Velocidad más -->
+        <button class="replay-btn-ctrl" onclick="cambiarVelocidadReplay(1)" title="Más rápido">▶▶</button>
+
+        <!-- Barra de progreso / seek -->
+        <input 
+          type="range" 
+          id="replay-barra" 
+          min="0" max="100" value="0" step="0.1"
+          oninput="seekReplay(this.value)"
+          title="Arrastrar para navegar el replay"
+        >
+
+        <!-- Tiempo actual -->
+        <span id="replay-tiempo">00:00.0 / 00:00.0</span>
+
+        <!-- Cerrar replay -->
+        <button class="replay-btn-cerrar" onclick="detenerReplay()" title="Cerrar replay">✕ Cerrar</button>
+      </div>
+    </div>
+
+  </div>
 
   <!-- Panel lateral rígido de la derecha -->
   <div id="side-panel">
@@ -223,11 +379,17 @@
       <a href="ejemplo.html" target="_blank" style="color:#58a6ff; text-decoration:none;">📖 Ver ejemplo de uso →</a>
     </div>
 
-    <!-- PANEL DE RECORDS -->
-    <div class="records-wrapper" style="margin-top: 15px; flex: none; display:flex; flex-direction:column; background: #010409; border-radius: 6px; border: 1px solid rgba(240, 246, 252, 0.1); padding: 15px; font-size: 13px; max-height: 250px;">
+    <!-- PANEL DE RECORDS / HISTORIAL -->
+    <div class="records-wrapper" style="margin-top: 15px; flex: none; display:flex; flex-direction:column; background: #010409; border-radius: 6px; border: 1px solid rgba(240, 246, 252, 0.1); padding: 15px; font-size: 13px; max-height: 300px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
         <strong style="color: #8b949e;">⏱ Historial de Intentos</strong>
-        <button onclick="limpiarRecords()" style="flex:none; background:transparent; color:#f85149; border:none; padding:0; cursor:pointer; font-size:12px; font-weight:normal; text-decoration:underline;">Limpiar</button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <!-- Leyenda de replay -->
+          <span style="color:#8b949e; font-size:11px;">
+            <span style="color:#ffa500;">⏮</span> = ver replay (solo en pausa)
+          </span>
+          <button onclick="limpiarRecords()" style="flex:none; background:transparent; color:#f85149; border:none; padding:0; cursor:pointer; font-size:12px; font-weight:normal; text-decoration:underline;">Limpiar</button>
+        </div>
       </div>
       <div id="records-list" style="overflow-y: auto; flex:1;">
         <!-- Se rellena desde JS -->
